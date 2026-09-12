@@ -1,0 +1,110 @@
+[
+  {
+    "forbiddenHits" : [
+
+    ],
+    "id" : "ak890-mobile-wireless-misleading",
+    "missingGroups" : [
+
+    ],
+    "passed" : true,
+    "reply" : "亲，AK890仅支持连接Windows电脑使用USB打印，不支持iPhone蓝牙，也不能改连WiFi。若需要手机无线打印，建议选择支持蓝牙或WiFi的对应型号。",
+    "submittedHistoryBytes" : 103,
+    "totalMilliseconds" : 10379.405625
+  },
+  {
+    "forbiddenHits" : [
+
+    ],
+    "id" : "m880-light-print-next-step",
+    "missingGroups" : [
+
+    ],
+    "passed" : true,
+    "reply" : "亲，下一步请先拔掉M880电源，再按视频重新安装色带，重点确认色带平整、没有扭曲，并穿在打印头与不锈钢片之间。安装教程：http://cloud.video.taobao.com/play/u/null/p/1/e/6/t/1/491106253912.mp4\n操作完成后试打一张，告诉我是否仍然很浅。",
+    "submittedHistoryBytes" : 215,
+    "totalMilliseconds" : 14915.671583
+  },
+  {
+    "forbiddenHits" : [
+
+    ],
+    "id" : "m880-third-party-card-hidden-video",
+    "missingGroups" : [
+      [
+        "491279178909.mp4"
+      ]
+    ],
+    "passed" : false,
+    "reply" : "亲，原装卡能正常打印，说明机器基本正常。请先把第15组临时设为00测试：长按Setting，出现FF后输入0000，再按Setting切换到15组，用Increase/Decrease调成00并保存，然后插这张文具店卡测试。对应教程是“6.setting & paper In（设置与放卡/进纸）”。",
+    "submittedHistoryBytes" : 151,
+    "totalMilliseconds" : 11601.302333
+  },
+  {
+    "forbiddenHits" : [
+
+    ],
+    "id" : "old-history-pollution-m880-power",
+    "missingGroups" : [
+
+    ],
+    "passed" : true,
+    "reply" : "亲，普通款 M880 不支持停电打卡，停电后完全不工作是正常的，需要来电后接原装适配器使用。如需停电时也能打卡，可考虑 M880D 等带备用电池的款式。",
+    "submittedHistoryBytes" : 4602,
+    "totalMilliseconds" : 10722.991459
+  },
+  {
+    "forbiddenHits" : [
+
+    ],
+    "id" : "td630g-mac-wireless-boundary",
+    "missingGroups" : [
+
+    ],
+    "passed" : true,
+    "reply" : "亲，TD630G 在 MacBook 上不支持 WiFi 无线打印，只支持通过 USB 连接使用。如果您必须不用 USB，MacBook 暂时无法使用这款机器打印。",
+    "submittedHistoryBytes" : 111,
+    "totalMilliseconds" : 7762.170333
+  },
+  {
+    "forbiddenHits" : [
+
+    ],
+    "id" : "three-overlapping-cross-midnight-shifts",
+    "missingGroups" : [
+      [
+        "491279010943.mp4"
+      ]
+    ],
+    "passed" : false,
+    "reply" : "亲，这三种班次互相重叠且包含跨天，M880 自动模式无法准确区分，不能直接设置成三组自动班次，建议使用手动打卡：把 `02` 组设为 `00`，打卡时按对应的 1–6 号键选择栏位后再放卡；同一栏位第一位员工选好后，后面员工可直接放卡，每人每天最多打 6 次。班次设置可参考视频《2.set shift .mp4》，但您这种重叠班次请按手动模式使用。",
+    "submittedHistoryBytes" : 181,
+    "totalMilliseconds" : 17291.122
+  },
+  {
+    "forbiddenHits" : [
+
+    ],
+    "id" : "two-unanswered-questions-one-batch",
+    "missingGroups" : [
+
+    ],
+    "passed" : true,
+    "reply" : "亲，TD630支持连接原生 Mac，连接方式是 USB 和蓝牙，不支持 WiFi；如果需要 WiFi，可选择 TD630G。",
+    "submittedHistoryBytes" : 132,
+    "totalMilliseconds" : 7285.458125
+  },
+  {
+    "forbiddenHits" : [
+
+    ],
+    "id" : "windows-unknown-usb-descriptor",
+    "missingGroups" : [
+
+    ],
+    "passed" : true,
+    "reply" : "亲，第一步请确认打印机已通电开机，然后更换一根可传输数据的USB打印线，并直接插到电脑另一个USB接口（不要使用扩展坞）。完成后请看设备管理器是否还显示“未知USB设备”，把结果告诉我。",
+    "submittedHistoryBytes" : 176,
+    "totalMilliseconds" : 7392.725291
+  }
+]

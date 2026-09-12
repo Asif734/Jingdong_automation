@@ -1,0 +1,106 @@
+[
+  {
+    "forbiddenHits" : [
+
+    ],
+    "id" : "ak890-mobile-wireless-misleading",
+    "missingGroups" : [
+
+    ],
+    "passed" : true,
+    "reply" : "亲，AK890仅支持USB连接Windows电脑，不支持iPhone蓝牙，也不能改连WiFi。若需要手机无线打印，建议选择支持对应连接方式的型号。",
+    "submittedHistoryBytes" : 103,
+    "totalMilliseconds" : 8676.9765
+  },
+  {
+    "forbiddenHits" : [
+
+    ],
+    "id" : "m880-group15-no-matching-video",
+    "missingGroups" : [
+
+    ],
+    "passed" : true,
+    "reply" : "亲，原装卡能正常打印，说明机器基本正常，同尺寸第三方卡也可能因识别点不同被退卡。请先长按设置键进入设置，将第15组临时改为00并按确认键保存，重新插电后用一张第三方废卡测试。知识库暂无第15组对应的可信视频，暂不能给您发送，避免误导。",
+    "submittedHistoryBytes" : 151,
+    "totalMilliseconds" : 17018.501916
+  },
+  {
+    "forbiddenHits" : [
+
+    ],
+    "id" : "m880-light-print-next-step",
+    "missingGroups" : [
+
+    ],
+    "passed" : true,
+    "reply" : "亲，下一步请先拔掉电源让机器完全断电，再重新安装色带，确认色带平整、不松动，并穿在打印头与不锈钢片之间。操作视频（重点看00:46–01:04）：http://cloud.video.taobao.com/play/u/null/p/1/e/6/t/1/491106253912.mp4\n装好后试打一张，把效果告诉我。",
+    "submittedHistoryBytes" : 215,
+    "totalMilliseconds" : 28008.551417
+  },
+  {
+    "forbiddenHits" : [
+
+    ],
+    "id" : "old-history-pollution-m880-power",
+    "missingGroups" : [
+
+    ],
+    "passed" : true,
+    "reply" : "亲，普通款 M880 不支持停电打卡，停电后无法工作。请来电后使用原装适配器接通电源再使用；如需停电时也能打卡，建议选择带备用电池的 M880D 款。",
+    "submittedHistoryBytes" : 4602,
+    "totalMilliseconds" : 9419.496125
+  },
+  {
+    "forbiddenHits" : [
+
+    ],
+    "id" : "td630g-mac-wireless-boundary",
+    "missingGroups" : [
+
+    ],
+    "passed" : true,
+    "reply" : "亲，TD630G 在 MacBook 上不支持 WiFi 无线打印，只支持通过 USB 连接使用。如果您不使用 USB，目前无法在 MacBook 上打印。",
+    "submittedHistoryBytes" : 111,
+    "totalMilliseconds" : 6632.218917
+  },
+  {
+    "forbiddenHits" : [
+
+    ],
+    "id" : "three-overlapping-cross-midnight-shifts",
+    "missingGroups" : [
+
+    ],
+    "passed" : true,
+    "reply" : "亲，这三种班次存在重叠和跨天，自动模式无法准确判断打卡栏位，不能强行设置，建议改用手动打卡。先长按设置键进入设置，将第02组设为00；需要打印哪个位置就按对应按键后放卡，同一位置后续员工可直接放卡，每人每天最多打印6次，手动打印均为黑色。\n手动打卡设置视频（请看00:03–00:49）：http://cloud.video.taobao.com/play/u/null/p/1/e/6/t/1/491279010943.mp4",
+    "submittedHistoryBytes" : 181,
+    "totalMilliseconds" : 20169.129334
+  },
+  {
+    "forbiddenHits" : [
+
+    ],
+    "id" : "two-unanswered-questions-one-batch",
+    "missingGroups" : [
+
+    ],
+    "passed" : true,
+    "reply" : "亲，TD630支持原生Mac，可通过USB连接，也支持蓝牙，但不支持WiFi。需要WiFi功能的话可以选择TD630G，它支持USB、蓝牙和WiFi。",
+    "submittedHistoryBytes" : 132,
+    "totalMilliseconds" : 7004.551875
+  },
+  {
+    "forbiddenHits" : [
+
+    ],
+    "id" : "windows-unknown-usb-descriptor",
+    "missingGroups" : [
+
+    ],
+    "passed" : true,
+    "reply" : "亲，第一步请确认打印机已通电开机，然后换一根可传输数据的USB打印线，并直插电脑另一个USB接口（不要使用扩展坞）。完成后请告诉我设备管理器是否仍显示“未知USB设备/设备描述符请求失败”。",
+    "submittedHistoryBytes" : 176,
+    "totalMilliseconds" : 9846.908459
+  }
+]

@@ -1,0 +1,108 @@
+[
+  {
+    "forbiddenHits" : [
+
+    ],
+    "id" : "ak890-mobile-wireless-misleading",
+    "missingGroups" : [
+
+    ],
+    "passed" : true,
+    "reply" : "亲，AK890仅支持连接Windows电脑通过USB打印，不支持iPhone蓝牙或WiFi打印。若您需要手机无线打印，可以选择支持蓝牙的TD630，或同时支持蓝牙和WiFi的TD630G。",
+    "submittedHistoryBytes" : 103,
+    "totalMilliseconds" : 7641.627042
+  },
+  {
+    "forbiddenHits" : [
+
+    ],
+    "id" : "m880-light-print-next-step",
+    "missingGroups" : [
+
+    ],
+    "passed" : true,
+    "reply" : "亲，下一步请先拔掉M880电源，再重新安装色带，确认色带平整无松动、扭曲，并穿在打印头与不锈钢片之间。色带安装视频：http://cloud.video.taobao.com/play/u/null/p/1/e/6/t/1/491106253912.mp4\n装好后试打一张，告诉我是否仍然很浅。",
+    "submittedHistoryBytes" : 215,
+    "totalMilliseconds" : 12516.900958
+  },
+  {
+    "forbiddenHits" : [
+
+    ],
+    "id" : "m880-third-party-card-hidden-video",
+    "missingGroups" : [
+      [
+        "491279178909.mp4"
+      ]
+    ],
+    "passed" : false,
+    "reply" : "亲，请先把第15组临时改为“00”测试：长按设置键，屏幕显示FF后输入密码0000，切换到第15组，将数值改为00并按确认键保存，再插入这张第三方卡试打。原装卡正常使用时第15组通常保持01。知识库暂无可核实的第15组对应视频，因此不发送不匹配的视频。",
+    "submittedHistoryBytes" : 151,
+    "totalMilliseconds" : 18119.613708
+  },
+  {
+    "forbiddenHits" : [
+
+    ],
+    "id" : "old-history-pollution-m880-power",
+    "missingGroups" : [
+
+    ],
+    "passed" : true,
+    "reply" : "亲，普通款 M880 不支持停电打卡，停电时无法工作；来电后请接回原装适配器使用。若需要停电时也能打卡，建议选择带备用电池的 M880D 等停电打卡款。",
+    "submittedHistoryBytes" : 4602,
+    "totalMilliseconds" : 8822.168292
+  },
+  {
+    "forbiddenHits" : [
+
+    ],
+    "id" : "td630g-mac-wireless-boundary",
+    "missingGroups" : [
+
+    ],
+    "passed" : true,
+    "reply" : "亲，TD630G 在 MacBook 上不支持 WiFi 无线打印，只能通过 USB 连接使用；如果您必须不用 USB，MacBook 目前无法使用该机型打印。",
+    "submittedHistoryBytes" : 111,
+    "totalMilliseconds" : 7829.782375
+  },
+  {
+    "forbiddenHits" : [
+
+    ],
+    "id" : "three-overlapping-cross-midnight-shifts",
+    "missingGroups" : [
+
+    ],
+    "passed" : true,
+    "reply" : "亲，这三种班次互相重叠，自动模式无法准确判断打卡栏位，建议设置手动打卡：第02组设为00，第03–08组按实际班次设置，第09–12组跳过；打卡时选择对应栏位，每人每天最多6次，统一打印黑色。\n手动打卡设置视频（请看00:03–00:49）：http://cloud.video.taobao.com/play/u/null/p/1/e/6/t/1/491279010943.mp4",
+    "submittedHistoryBytes" : 181,
+    "totalMilliseconds" : 16525.50825
+  },
+  {
+    "forbiddenHits" : [
+
+    ],
+    "id" : "two-unanswered-questions-one-batch",
+    "missingGroups" : [
+
+    ],
+    "passed" : true,
+    "reply" : "亲，TD630支持原生 Mac，可通过 USB 连接；它支持 USB 和蓝牙，不支持 WiFi。需要 WiFi 的话请选择 TD630G。",
+    "submittedHistoryBytes" : 132,
+    "totalMilliseconds" : 7179.605042
+  },
+  {
+    "forbiddenHits" : [
+
+    ],
+    "id" : "windows-unknown-usb-descriptor",
+    "missingGroups" : [
+
+    ],
+    "passed" : true,
+    "reply" : "亲，第一步请确认打印机已通电开机，然后更换一根可传输数据的 USB 打印线，并直插电脑另一个 USB 接口（不要使用扩展坞）。操作后请告诉我设备管理器是否仍显示“设备描述符请求失败”。",
+    "submittedHistoryBytes" : 176,
+    "totalMilliseconds" : 8345.627583
+  }
+]

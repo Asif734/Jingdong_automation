@@ -1,0 +1,12 @@
+.build*/
+.swiftpm/
+node_modules/
+output/
+runtime/
+evidence/
+.superpowers/
+.worktrees/
+.DS_Store
+# Local generated caches and build products
+**/__pycache__/
+build-output/

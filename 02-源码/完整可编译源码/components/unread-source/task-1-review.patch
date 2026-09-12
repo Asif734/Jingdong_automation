@@ -1,0 +1,791 @@
+diff --git a/work/qianniu-unread-assistant/Package.swift b/work/qianniu-unread-assistant/Package.swift
+new file mode 100644
+index 0000000..a71d2c1
+--- /dev/null
++++ b/work/qianniu-unread-assistant/Package.swift
+@@ -0,0 +1,6 @@
++// swift-tools-version: 6.0
++import PackageDescription
++let package = Package(name: "QianniuUnreadAssistant", platforms: [.macOS(.v14)], products: [
++    .library(name: "UnreadCore", targets: ["UnreadCore"]),
++    .executable(name: "UnreadApp", targets: ["UnreadApp"])
++], targets: [.target(name: "UnreadCore"), .executableTarget(name: "UnreadApp", dependencies: ["UnreadCore"]), .testTarget(name: "UnreadCoreTests", dependencies: ["UnreadCore"])])
+diff --git a/work/qianniu-unread-assistant/Sources/UnreadCore/ConversationLocator.swift b/work/qianniu-unread-assistant/Sources/UnreadCore/ConversationLocator.swift
+new file mode 100644
+index 0000000..630139e
+--- /dev/null
++++ b/work/qianniu-unread-assistant/Sources/UnreadCore/ConversationLocator.swift
+@@ -0,0 +1,76 @@
++import Foundation
++import CoreGraphics
++public enum ConversationLocator {
++    public static func rows(nodes: [AXNode], window: CGRect) throws -> [ConversationRow] {
++        let anchors = nodes.filter { $0.labels.contains("正在接待买家列表") && window.contains($0.frame) }
++        guard anchors.count == 1, let anchor = anchors.first,
++              let headerNode = headerNode(nodes: nodes, window: window) else {
++            throw AssistantError.unsafe("无法确认接待列表与聊天顶部结构；请打开千牛接待中心。")
++        }
++        let byID = Dictionary(nodes.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
++        func belowAnchorParent(_ node: AXNode) -> Bool {
++            var parent = node.parent
++            for _ in 0..<40 {
++                guard let id = parent else { return false }
++                if id == anchor.parent { return true }
++                parent = byID[id]?.parent
++            }
++            return false
++        }
++        let containers = nodes.filter { node in
++            ["AXGroup", "AXList", "AXOutline", "AXScrollArea"].contains(node.role)
++            && node.frame.width >= 100 && node.frame.width < window.width * 0.4
++            && node.frame.minY >= anchor.frame.maxY - 3
++            && node.frame.maxX <= headerNode.frame.minX
++            && node.frame.minX <= anchor.frame.midX && node.frame.maxX >= anchor.frame.midX
++            && belowAnchorParent(node)
++        }
++        var result: [ConversationRow] = []
++        for container in containers {
++            for node in nodes where node.parent == container.id {
++                guard ["AXGroup", "AXRow"].contains(node.role), window.contains(node.frame), container.frame.contains(node.frame),
++                      node.frame.height >= 30, node.frame.height <= 100,
++                      node.frame.width >= container.frame.width * 0.75,
++                      node.frame.minY >= anchor.frame.maxY - 3,
++                      node.frame.maxX <= headerNode.frame.minX,
++                      let uid = identity(node) else { continue }
++                result.append(ConversationRow(nodeID: node.id, uid: uid, frame: node.frame))
++            }
++        }
++        guard !result.isEmpty else { throw AssistantError.unsafe("未找到可可靠识别的可见会话行（不是无未读结论）。") }
++        let counts = Dictionary(grouping: result, by: \.uid)
++        let unique = result.filter { counts[$0.uid]?.count == 1 }.sorted { $0.frame.minY < $1.frame.minY }
++        guard !unique.isEmpty else { throw AssistantError.unsafe("可见会话身份有歧义；未点击。") }
++        return unique
++    }
++    public static func fresh(uid: String, rows: [ConversationRow]) -> ConversationRow? {
++        let matches = rows.filter { $0.uid == uid }
++        return matches.count == 1 ? matches[0] : nil
++    }
++    public static func verified(expected: String, actual: String?) -> Bool {
++        !expected.isEmpty && !isTruncated(expected) && actual == expected
++    }
++    public static func header(nodes: [AXNode], window: CGRect) -> String? {
++        headerNode(nodes: nodes, window: window).flatMap(identity)
++    }
++    private static func headerNode(nodes: [AXNode], window: CGRect) -> AXNode? {
++        let controls = nodes.filter { $0.labels.contains("转发当前用户") && window.contains($0.frame) }
++        guard controls.count == 1, let control = controls.first,
++              nodes.contains(where: { $0.labels.contains("新建任务") && abs($0.frame.midY - control.frame.midY) < 20 }) else { return nil }
++        let candidates = nodes.filter {
++            $0.role == "AXStaticText" && $0.frame.width > 20 && $0.frame.height > 8
++            && $0.frame.maxX < control.frame.minX && $0.frame.minX > window.minX + window.width * 0.18
++            && abs($0.frame.midY - control.frame.midY) < max(12, control.frame.height * 0.5)
++            && $0.frame.minY < window.minY + window.height * 0.3
++            && identity($0) != nil
++        }
++        return candidates.count == 1 ? candidates[0] : nil
++    }
++    private static func isTruncated(_ text: String) -> Bool { text.contains("…") || text.contains("...") }
++    private static func identity(_ node: AXNode) -> String? {
++        let labels = Set(node.labels.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !["group", "text", "容器", "文本"].contains($0) })
++        guard labels.count == 1, let uid = labels.first, !uid.isEmpty,
++              !isTruncated(uid), !uid.contains("\n"), uid.count <= 256 else { return nil }
++        return uid
++    }
++}
+diff --git a/work/qianniu-unread-assistant/Sources/UnreadCore/Models.swift b/work/qianniu-unread-assistant/Sources/UnreadCore/Models.swift
+new file mode 100644
+index 0000000..fcd0d2f
+--- /dev/null
++++ b/work/qianniu-unread-assistant/Sources/UnreadCore/Models.swift
+@@ -0,0 +1,32 @@
++import Foundation
++import CoreGraphics
++
++public struct AXNode: Sendable, Equatable {
++    public let id: Int
++    public let parent: Int?
++    public let role: String
++    public let title: String
++    public let value: String
++    public let description: String
++    public let frame: CGRect
++    public init(id: Int, parent: Int? = nil, role: String, title: String = "", value: String = "", description: String = "", frame: CGRect) {
++        self.id = id; self.parent = parent; self.role = role; self.title = title; self.value = value; self.description = description; self.frame = frame
++    }
++    public var labels: [String] { [title, value, description].filter { !$0.isEmpty } }
++}
++public struct ConversationRow: Sendable, Equatable {
++    public let nodeID: Int
++    public let uid: String
++    public let frame: CGRect
++    public init(nodeID: Int, uid: String, frame: CGRect) { self.nodeID = nodeID; self.uid = uid; self.frame = frame }
++}
++public struct PixelImage: Sendable {
++    public let width: Int
++    public let height: Int
++    public let rgba: [UInt8]
++    public init(width: Int, height: Int, rgba: [UInt8]) { self.width = width; self.height = height; self.rgba = rgba }
++}
++public enum AssistantError: Error, LocalizedError, Equatable {
++    case unsafe(String)
++    public var errorDescription: String? { if case .unsafe(let text) = self { return text }; return nil }
++}
+diff --git a/work/qianniu-unread-assistant/Sources/UnreadCore/OpenWorkflow.swift b/work/qianniu-unread-assistant/Sources/UnreadCore/OpenWorkflow.swift
+new file mode 100644
+index 0000000..ca67c97
+--- /dev/null
++++ b/work/qianniu-unread-assistant/Sources/UnreadCore/OpenWorkflow.swift
+@@ -0,0 +1,51 @@
++import CoreGraphics
++import Foundation
++
++public struct SceneSnapshot: Sendable, Equatable {
++    public let windowID: UInt32
++    public let frame: CGRect
++    public let rows: [ConversationRow]
++    public init(windowID: UInt32, frame: CGRect, rows: [ConversationRow]) { self.windowID = windowID; self.frame = frame; self.rows = rows }
++}
++@MainActor public protocol UnreadSession {
++    func check() throws
++    func snapshot() throws -> SceneSnapshot
++    func capture(_ snapshot: SceneSnapshot) async throws -> PixelImage
++    func activate() throws
++    func click(_ row: ConversationRow, scene: SceneSnapshot) throws
++    func header() throws -> String?
++}
++public struct OpenOutcome: Equatable, Sendable {
++    public let found: [String]
++    public let verifiedUID: String?
++}
++@MainActor public enum OpenWorkflow {
++    public static func run(session: any UnreadSession, status: (String) -> Void = { _ in }) async throws -> OpenOutcome {
++        status("检查权限与可见列表…")
++        try session.check()
++        func observed() async throws -> (SceneSnapshot, [ConversationRow]) {
++            let before = try session.snapshot()
++            let image = try await session.capture(before)
++            let after = try session.snapshot()
++            guard before == after else { throw AssistantError.unsafe("截图期间窗口或列表已变化；未点击，请重试。") }
++            return (after, RedDotDetector.targets(image: image, window: after.frame, rows: after.rows))
++        }
++        let (_, targets) = try await observed()
++        guard let target = targets.first else { return OpenOutcome(found: [], verifiedUID: nil) }
++        status("发现：" + targets.map(\.uid).joined(separator: "、"))
++        let (_, refreshed) = try await observed()
++        guard ConversationLocator.fresh(uid: target.uid, rows: refreshed) != nil else { throw AssistantError.unsafe("目标已消失或红点已改变；未点击。") }
++        try session.activate()
++        status("打开并核对：" + target.uid)
++        let (scene, finalTargets) = try await observed()
++        guard let fresh = ConversationLocator.fresh(uid: target.uid, rows: finalTargets) else { throw AssistantError.unsafe("激活后目标或红点已变化；未点击。") }
++        try session.click(fresh, scene: scene)
++        for attempt in 0..<8 {
++            if ConversationLocator.verified(expected: target.uid, actual: try session.header()) {
++                return OpenOutcome(found: targets.map(\.uid), verifiedUID: target.uid)
++            }
++            if attempt < 7 { try await Task.sleep(for: .milliseconds(150)) }
++        }
++        throw AssistantError.unsafe("聊天顶部完整 ID 与目标不一致；未确认打开，已停止。")
++    }
++}
+diff --git a/work/qianniu-unread-assistant/Sources/UnreadCore/RedDotDetector.swift b/work/qianniu-unread-assistant/Sources/UnreadCore/RedDotDetector.swift
+new file mode 100644
+index 0000000..c9e7045
+--- /dev/null
++++ b/work/qianniu-unread-assistant/Sources/UnreadCore/RedDotDetector.swift
+@@ -0,0 +1,49 @@
++import Foundation
++import CoreGraphics
++public enum RedDotDetector {
++    public static func targets(image: PixelImage, window: CGRect, rows: [ConversationRow]) -> [ConversationRow] {
++        guard image.width > 0, image.height > 0, image.width <= 20000, image.height <= 20000,
++              image.rgba.count == image.width * image.height * 4, window.width > 0, window.height > 0 else { return [] }
++        let sx = CGFloat(image.width) / window.width, sy = CGFloat(image.height) / window.height
++        guard abs(sx / sy - 1) < 0.03 else { return [] }
++        return rows.filter { row in
++            guard window.contains(row.frame), row.frame.height >= 30 else { return false }
++            let h = row.frame.height
++            // Search enough of the avatar to reject components connected to its red artwork.
++            let area = CGRect(x: row.frame.minX, y: row.frame.minY, width: h * 1.1, height: h)
++            let x0 = max(0, Int((area.minX - window.minX) * sx)), x1 = min(image.width, Int(ceil((area.maxX - window.minX) * sx)))
++            let y0 = max(0, Int((area.minY - window.minY) * sy)), y1 = min(image.height, Int(ceil((area.maxY - window.minY) * sy)))
++            guard x0 < x1, y0 < y1 else { return false }
++            func red(_ x: Int, _ y: Int) -> Bool {
++                let i = (y * image.width + x) * 4
++                let r = Int(image.rgba[i]), g = Int(image.rgba[i+1]), b = Int(image.rgba[i+2])
++                return r >= 185 && g < 100 && b < 115 && r - g > 100 && r - b > 85
++            }
++            var visited = Set<Int>()
++            for y in y0..<y1 { for x in x0..<x1 {
++                let key = y * image.width + x
++                guard !visited.contains(key), red(x, y) else { continue }
++                visited.insert(key)
++                var queue = [(x, y)], index = 0
++                var minX = x, maxX = x, minY = y, maxY = y
++                while index < queue.count {
++                    let (px, py) = queue[index]; index += 1
++                    minX = min(minX, px); maxX = max(maxX, px); minY = min(minY, py); maxY = max(maxY, py)
++                    for (nx, ny) in [(px-1,py),(px+1,py),(px,py-1),(px,py+1)] where nx >= x0 && nx < x1 && ny >= y0 && ny < y1 {
++                        let next = ny * image.width + nx
++                        if !visited.contains(next) && red(nx, ny) { visited.insert(next); queue.append((nx, ny)) }
++                    }
++                }
++                let w = CGFloat(maxX - minX + 1) / sx, height = CGFloat(maxY - minY + 1) / sy
++                let cx = (CGFloat(minX + maxX) * 0.5 / sx + window.minX - row.frame.minX) / h
++                let cy = (CGFloat(minY + maxY) * 0.5 / sy + window.minY - row.frame.minY) / h
++                let density = CGFloat(queue.count) / CGFloat((maxX-minX+1)*(maxY-minY+1))
++                if cx >= 0.62 && cx <= 0.93 && cy >= 0.08 && cy <= 0.34,
++                   w >= h * 0.07 && w <= h * 0.23, height >= h * 0.07 && height <= h * 0.23,
++                   w / height >= 0.65 && w / height <= 1.5, density >= 0.55,
++                   minX > x0 && maxX < x1-1 && minY > y0 && maxY < y1-1 { return true }
++            } }
++            return false
++        }.sorted { $0.frame.minY < $1.frame.minY }
++    }
++}
+diff --git a/work/qianniu-unread-assistant/Sources/UnreadApp/NativeSession.swift b/work/qianniu-unread-assistant/Sources/UnreadApp/NativeSession.swift
+new file mode 100644
+index 0000000..b7e29de
+--- /dev/null
++++ b/work/qianniu-unread-assistant/Sources/UnreadApp/NativeSession.swift
+@@ -0,0 +1,156 @@
++import AppKit
++import ApplicationServices
++import UnreadCore
++
++@MainActor final class NativeSession: UnreadSession {
++    private var application: NSRunningApplication?
++    private var windowElement: AXUIElement?
++    private var elements: [Int: AXUIElement] = [:]
++    private var deadline = Date()
++
++    func check() throws {
++        guard AXIsProcessTrusted() else { throw AssistantError.unsafe("缺少辅助功能权限：系统设置 → 隐私与安全性 → 辅助功能，添加并启用“千牛未读助手”。授权后重新打开本应用。") }
++        guard CGPreflightScreenCaptureAccess() else { throw AssistantError.unsafe("缺少屏幕录制权限：系统设置 → 隐私与安全性 → 屏幕与系统音频录制，添加并启用“千牛未读助手”。授权后重新打开本应用。") }
++        let matches = NSWorkspace.shared.runningApplications.filter { $0.localizedName == "千牛" || $0.localizedName == "Qianniu" }
++        guard matches.count == 1, let app = matches.first else { throw AssistantError.unsafe("请先打开千牛接待中心（未找到唯一千牛进程）。") }
++        application = app
++    }
++
++    func snapshot() throws -> SceneSnapshot {
++        let (nodes, frame, id) = try readWindow()
++        writeDiagnostic(nodes: nodes, frame: frame, windowID: id)
++        let rows = try ConversationLocator.rows(nodes: nodes, window: frame)
++        return SceneSnapshot(windowID: id, frame: frame, rows: rows)
++    }
++    func capture(_ snapshot: SceneSnapshot) async throws -> PixelImage {
++        guard let app = application else { throw AssistantError.unsafe("千牛进程不可用。") }
++        return try await WindowCapture.capture(snapshot, pid: app.processIdentifier)
++    }
++    func activate() throws {
++        guard let app = application, let window = windowElement else { throw AssistantError.unsafe("千牛窗口不可用。") }
++        app.activate(options: [])
++        guard AXUIElementPerformAction(window, kAXRaiseAction as CFString) == .success else { throw AssistantError.unsafe("无法激活千牛接待窗口。") }
++    }
++    func click(_ row: ConversationRow, scene: SceneSnapshot) throws {
++        // Re-resolve immediately, synchronously, after the last asynchronous capture.
++        let freshScene = try snapshot()
++        guard freshScene == scene,
++              let fresh = ConversationLocator.fresh(uid: row.uid, rows: freshScene.rows), fresh.frame == row.frame,
++              let element = elements[fresh.nodeID], let app = application,
++              NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier else {
++            throw AssistantError.unsafe("点击前窗口、行位置或前台应用已变化；未点击。")
++        }
++        var actionNames: CFArray?
++        AXUIElementCopyActionNames(element, &actionNames)
++        if (actionNames as? [String] ?? []).contains(kAXPressAction as String) {
++            guard AXUIElementPerformAction(element, kAXPressAction as CFString) == .success else { throw AssistantError.unsafe("会话 AXPress 失败；未重复点击。") }
++            return
++        }
++        let point = CGPoint(x: fresh.frame.minX + fresh.frame.width * 0.5, y: fresh.frame.midY)
++        var hit: AXUIElement?
++        guard AXUIElementCopyElementAtPosition(AXUIElementCreateSystemWide(), Float(point.x), Float(point.y), &hit) == .success,
++              let hit, isDescendant(hit, of: element) else { throw AssistantError.unsafe("目标行被遮挡或命中核对失败；未点击。") }
++        guard let down = CGEvent(mouseEventSource: nil, mouseType: .leftMouseDown, mouseCursorPosition: point, mouseButton: .left),
++              let up = CGEvent(mouseEventSource: nil, mouseType: .leftMouseUp, mouseCursorPosition: point, mouseButton: .left) else { throw AssistantError.unsafe("无法创建点击事件。") }
++        down.post(tap: .cghidEventTap); up.post(tap: .cghidEventTap)
++    }
++    func header() throws -> String? {
++        let (nodes, frame, _) = try readWindow()
++        return ConversationLocator.header(nodes: nodes, window: frame)
++    }
++    private func isDescendant(_ hit: AXUIElement, of row: AXUIElement) -> Bool {
++        var current = hit
++        for _ in 0..<20 {
++            if CFEqual(current, row) { return true }
++            guard let parent = attribute(current, kAXParentAttribute) else { return false }
++            guard CFGetTypeID(parent) == AXUIElementGetTypeID() else { return false }
++            current = unsafeDowncast(parent, to: AXUIElement.self)
++        }
++        return false
++    }
++    private func readWindow() throws -> ([AXNode], CGRect, UInt32) {
++        guard let app = application, !app.isTerminated, !app.isHidden else { throw AssistantError.unsafe("千牛未运行或已隐藏。") }
++        deadline = Date().addingTimeInterval(5)
++        let axApp = AXUIElementCreateApplication(app.processIdentifier)
++        AXUIElementSetMessagingTimeout(axApp, 0.2)
++        let windows = attribute(axApp, kAXWindowsAttribute) as? [AXUIElement] ?? []
++        let candidates = windows.filter { window in
++            let title = string(window, kAXTitleAttribute)
++            return title.contains("接待") && (attribute(window, kAXMinimizedAttribute) as? Bool != true)
++        }
++        guard candidates.count == 1, let window = candidates.first, let frame = frame(window), frame.width > 500, frame.height > 300 else {
++            throw AssistantError.unsafe("未找到唯一可见接待窗口；请打开接待中心并取消最小化。")
++        }
++        let windowInfo = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
++        let matching = windowInfo.filter { item in
++            guard (item[kCGWindowOwnerPID as String] as? Int32) == app.processIdentifier,
++                  (item[kCGWindowLayer as String] as? Int) == 0,
++                  let bounds = item[kCGWindowBounds as String] as? NSDictionary,
++                  let rect = CGRect(dictionaryRepresentation: bounds) else { return false }
++            return abs(rect.minX-frame.minX) < 1 && abs(rect.minY-frame.minY) < 1 && abs(rect.width-frame.width) < 1 && abs(rect.height-frame.height) < 1
++        }
++        guard matching.count == 1, let id = matching.first?[kCGWindowNumber as String] as? UInt32 else { throw AssistantError.unsafe("无法匹配当前可见接待窗口编号。") }
++        elements = [:]
++        var raw: [(id: Int, parent: Int?, role: String, frame: CGRect)] = []
++        var queue: [(AXUIElement, Int?, Int)] = [(window, nil, 0)], cursor = 0
++        while cursor < queue.count {
++            guard cursor < 2500, Date() < deadline else { throw AssistantError.unsafe("辅助功能结构读取超时或过大；未点击。") }
++            let (element, parent, depth) = queue[cursor]
++            let nodeID = cursor; cursor += 1
++            AXUIElementSetMessagingTimeout(element, 0.2)
++            elements[nodeID] = element
++            raw.append((nodeID, parent, string(element, kAXRoleAttribute), self.frame(element) ?? .zero))
++            if depth < 35 {
++                for child in attribute(element, kAXChildrenAttribute) as? [AXUIElement] ?? [] { queue.append((child, nodeID, depth + 1)) }
++            }
++        }
++        // Only control labels, row-container identity fields and header-aligned text are read.
++        // Chat body, message preview children and editable fields are never read.
++        var controls: [Int: AXNode] = [:]
++        for node in raw where ["AXButton", "AXMenuButton", "AXCheckBox", "AXRadioButton"].contains(node.role) {
++            let element = elements[node.id]!
++            controls[node.id] = AXNode(id: node.id, parent: node.parent, role: node.role, title: string(element, kAXTitleAttribute), description: string(element, kAXDescriptionAttribute), frame: node.frame)
++        }
++        let headerY = controls.values.first { $0.labels.contains("转发当前用户") }?.frame.midY
++        var nodes: [AXNode] = []
++        for node in raw {
++            if let control = controls[node.id] { nodes.append(control); continue }
++            let isRow = ["AXGroup", "AXRow"].contains(node.role) && node.frame.width >= 100 && node.frame.width < frame.width * 0.4 && node.frame.minX < frame.minX + frame.width * 0.28 && node.frame.height >= 30 && node.frame.height <= 100
++            let isHeader = node.role == "AXStaticText" && headerY.map { abs(node.frame.midY - $0) < 15 } == true
++            let element = elements[node.id]!
++            nodes.append(AXNode(id: node.id, parent: node.parent, role: node.role,
++                                title: isRow || isHeader ? string(element, kAXTitleAttribute) : "",
++                                value: isHeader ? string(element, kAXValueAttribute) : "",
++                                description: isRow || isHeader ? string(element, kAXDescriptionAttribute) : "", frame: node.frame))
++        }
++        guard Date() < deadline else { throw AssistantError.unsafe("辅助功能读取超时；未点击。") }
++        windowElement = window
++        return (nodes, frame, id)
++    }
++    private func attribute(_ element: AXUIElement, _ name: String) -> CFTypeRef? {
++        guard Date() < deadline else { return nil }
++        var value: CFTypeRef?
++        guard AXUIElementCopyAttributeValue(element, name as CFString, &value) == .success else { return nil }
++        return value
++    }
++    private func string(_ element: AXUIElement, _ name: String) -> String { attribute(element, name) as? String ?? "" }
++    private func frame(_ element: AXUIElement) -> CGRect? {
++        guard let pos = attribute(element, kAXPositionAttribute), let size = attribute(element, kAXSizeAttribute),
++              CFGetTypeID(pos) == AXValueGetTypeID(), CFGetTypeID(size) == AXValueGetTypeID() else { return nil }
++        var point = CGPoint.zero, dimensions = CGSize.zero
++        guard AXValueGetValue(unsafeDowncast(pos, to: AXValue.self), .cgPoint, &point), AXValueGetValue(unsafeDowncast(size, to: AXValue.self), .cgSize, &dimensions) else { return nil }
++        return CGRect(origin: point, size: dimensions)
++    }
++    private func writeDiagnostic(nodes: [AXNode], frame: CGRect, windowID: UInt32) {
++        let root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("QianniuUnreadAssistant", isDirectory: true)
++        do {
++            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
++            let lines = nodes.map { node in
++                let marker = node.labels.contains("正在接待买家列表") ? " receptionAnchor" : node.labels.contains("转发当前用户") ? " headerControl" : node.labels.contains("新建任务") ? " taskControl" : ""
++                return "\(node.id) p=\(node.parent.map(String.init) ?? "-") \(node.role) \(NSStringFromRect(node.frame))\(marker)"
++            }
++            let summary = "\(Date().ISO8601Format()) window=\(windowID) \(NSStringFromRect(frame)) nodes=\(nodes.count)\n" + lines.joined(separator: "\n")
++            try summary.write(to: root.appendingPathComponent("last-diagnostic.txt"), atomically: true, encoding: .utf8)
++        } catch { /* Diagnostics are best effort, never a reason to click. */ }
++    }
++}
+diff --git a/work/qianniu-unread-assistant/Sources/UnreadApp/UnreadAssistantApp.swift b/work/qianniu-unread-assistant/Sources/UnreadApp/UnreadAssistantApp.swift
+new file mode 100644
+index 0000000..15bc8b8
+--- /dev/null
++++ b/work/qianniu-unread-assistant/Sources/UnreadApp/UnreadAssistantApp.swift
+@@ -0,0 +1,54 @@
++import SwiftUI
++import UnreadCore
++
++@main struct UnreadAssistantApp: App {
++    var body: some Scene {
++        WindowGroup("千牛未读助手") { AssistantView() }
++            .defaultSize(width: 520, height: 280)
++            .windowResizability(.contentSize)
++    }
++}
++private struct AssistantView: View {
++    @State private var busy = false
++    @State private var status = "仅检查当前可见列表的头像红点；不发送消息。"
++    @State private var found = "—"
++    @State private var verified = "—"
++    @State private var elapsed = "—"
++    var body: some View {
++        VStack(alignment: .leading, spacing: 14) {
++            Text("千牛未读助手").font(.title2.bold())
++            Text("一次打开一个目标 · 不后台运行 · 不自动回复").foregroundStyle(.secondary)
++            Button(action: run) {
++                Text(busy ? "检查中…" : "查找并打开")
++                    .font(.headline).foregroundStyle(.white)
++                    .padding(.horizontal, 18).padding(.vertical, 9)
++                    .background(busy ? Color.gray : Color.blue, in: RoundedRectangle(cornerRadius: 8))
++            }.disabled(busy).buttonStyle(.plain)
++            Text(status).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
++            Text("发现 ID：\(found)").textSelection(.enabled)
++            Text("已核对 ID：\(verified)").textSelection(.enabled)
++            Text("用时：\(elapsed)").font(.caption).foregroundStyle(.secondary)
++            HStack(spacing: 18) {
++                Link("辅助功能设置", destination: URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
++                Link("屏幕录制设置", destination: URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")!)
++            }.font(.caption)
++        }.padding(24).frame(width: 520, alignment: .leading)
++    }
++    private func run() {
++        guard !busy else { return }
++        busy = true; found = "—"; verified = "—"; elapsed = "—"
++        let started = Date()
++        Task { @MainActor in
++            defer { busy = false; elapsed = String(format: "%.2f 秒", Date().timeIntervalSince(started)) }
++            do {
++                let outcome = try await OpenWorkflow.run(session: NativeSession()) { message in
++                    status = message
++                    if message.hasPrefix("发现：") { found = String(message.dropFirst(3)) }
++                }
++                found = outcome.found.isEmpty ? "—" : outcome.found.joined(separator: "、")
++                verified = outcome.verifiedUID ?? "—"
++                status = outcome.verifiedUID == nil ? "当前可见列表未检测到红点。" : "已打开并核对完整 ID；未发送消息。"
++            } catch { status = "停止：" + error.localizedDescription }
++        }
++    }
++}
+diff --git a/work/qianniu-unread-assistant/Sources/UnreadApp/WindowCapture.swift b/work/qianniu-unread-assistant/Sources/UnreadApp/WindowCapture.swift
+new file mode 100644
+index 0000000..ed077e7
+--- /dev/null
++++ b/work/qianniu-unread-assistant/Sources/UnreadApp/WindowCapture.swift
+@@ -0,0 +1,23 @@
++import ScreenCaptureKit
++import CoreGraphics
++import UnreadCore
++
++@MainActor enum WindowCapture {
++    static func capture(_ scene: SceneSnapshot, pid: pid_t) async throws -> PixelImage {
++        let content = try await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: true)
++        guard let window = content.windows.first(where: { $0.windowID == scene.windowID && $0.owningApplication?.processID == pid }),
++              window.frame == scene.frame else { throw AssistantError.unsafe("截图前千牛窗口已移动或不可见；未点击。") }
++        let filter = SCContentFilter(desktopIndependentWindow: window)
++        let configuration = SCStreamConfiguration()
++        configuration.width = Int(scene.frame.width * 2)
++        configuration.height = Int(scene.frame.height * 2)
++        configuration.showsCursor = false
++        configuration.ignoreShadowsSingleWindow = true
++        configuration.captureResolution = .best
++        let cg = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: configuration)
++        var bytes = [UInt8](repeating: 0, count: cg.width * cg.height * 4)
++        guard let context = CGContext(data: &bytes, width: cg.width, height: cg.height, bitsPerComponent: 8, bytesPerRow: cg.width * 4, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { throw AssistantError.unsafe("无法解码窗口截图。") }
++        context.draw(cg, in: CGRect(x: 0, y: 0, width: cg.width, height: cg.height))
++        return PixelImage(width: cg.width, height: cg.height, rgba: bytes)
++    }
++}
+diff --git a/work/qianniu-unread-assistant/Tests/UnreadCoreTests/OpenWorkflowTests.swift b/work/qianniu-unread-assistant/Tests/UnreadCoreTests/OpenWorkflowTests.swift
+new file mode 100644
+index 0000000..90819b9
+--- /dev/null
++++ b/work/qianniu-unread-assistant/Tests/UnreadCoreTests/OpenWorkflowTests.swift
+@@ -0,0 +1,70 @@
++import XCTest
++import CoreGraphics
++@testable import UnreadCore
++
++@MainActor final class OpenWorkflowTests: XCTestCase {
++    // A real workflow with fake external AX/capture boundaries: no live UI is executed.
++    // These catch stale clicks, skipped permission checks, and false success after a mismatched header.
++    func testOpensSameFullUIDAfterReorderingAndVerifiesHeader() async throws {
++        let session = FixtureSession()
++        session.reorderOnActivation = true
++        let result = try await OpenWorkflow.run(session: session)
++        XCTAssertEqual(result.found, ["stoneshishininger"])
++        XCTAssertEqual(result.verifiedUID, "stoneshishininger")
++        XCTAssertEqual(session.clicked?.frame.minY, 650)
++        XCTAssertEqual(session.clicks, 1)
++    }
++    func testPermissionFailureNeverCapturesOrClicks() async {
++        let session = FixtureSession(); session.denied = true
++        do { _ = try await OpenWorkflow.run(session: session); XCTFail("must throw") } catch {}
++        XCTAssertEqual(session.captures, 0); XCTAssertEqual(session.clicks, 0)
++    }
++    func testListChangesDuringCaptureNeverClick() async {
++        let session = FixtureSession(); session.moveDuringCapture = true
++        do { _ = try await OpenWorkflow.run(session: session); XCTFail("must throw") } catch {}
++        XCTAssertEqual(session.clicks, 0)
++    }
++    func testDisappearingDotAfterActivationNeverClick() async {
++        let session = FixtureSession(); session.removeDotOnActivation = true
++        do { _ = try await OpenWorkflow.run(session: session); XCTFail("must throw") } catch {}
++        XCTAssertEqual(session.clicks, 0)
++    }
++    func testHeaderMismatchDoesNotReportOpenedOrClickAnotherRow() async {
++        let session = FixtureSession(); session.actualHeader = "bob"
++        do { _ = try await OpenWorkflow.run(session: session); XCTFail("must throw") } catch {}
++        XCTAssertEqual(session.clicks, 1)
++    }
++    func testNoDotReturnsScopedEmptyResultWithoutActivation() async throws {
++        let session = FixtureSession(); session.hasDot = false
++        let result = try await OpenWorkflow.run(session: session)
++        XCTAssertNil(result.verifiedUID); XCTAssertTrue(result.found.isEmpty)
++        XCTAssertFalse(session.activated); XCTAssertEqual(session.clicks, 0)
++    }
++}
++
++@MainActor private final class FixtureSession: UnreadSession {
++    var denied = false, moveDuringCapture = false, reorderOnActivation = false, removeDotOnActivation = false
++    var hasDot = true, activated = false
++    var captures = 0, clicks = 0
++    var y: CGFloat = 250
++    var actualHeader = "stoneshishininger"
++    var clicked: ConversationRow?
++    let window = CGRect(x: 0, y: 0, width: 1287, height: 768)
++    func check() throws { if denied { throw AssistantError.unsafe("permission") } }
++    func snapshot() throws -> SceneSnapshot {
++        SceneSnapshot(windowID: 1, frame: window, rows: [ConversationRow(nodeID: 1, uid: "stoneshishininger", frame: CGRect(x: 64, y: y, width: 202, height: 44))])
++    }
++    func capture(_ snapshot: SceneSnapshot) async throws -> PixelImage {
++        captures += 1
++        let image = UnreadCoreTests().synthetic(dots: hasDot ? [(99, Int(y)+10)] : [])
++        if moveDuringCapture { y += 44 }
++        return image
++    }
++    func activate() throws {
++        activated = true
++        if reorderOnActivation { y = 650 }
++        if removeDotOnActivation { hasDot = false }
++    }
++    func click(_ row: ConversationRow, scene: SceneSnapshot) throws { clicks += 1; clicked = row }
++    func header() throws -> String? { actualHeader }
++}
+diff --git a/work/qianniu-unread-assistant/Tests/UnreadCoreTests/UnreadCoreTests.swift b/work/qianniu-unread-assistant/Tests/UnreadCoreTests/UnreadCoreTests.swift
+new file mode 100644
+index 0000000..0cdfbfc
+--- /dev/null
++++ b/work/qianniu-unread-assistant/Tests/UnreadCoreTests/UnreadCoreTests.swift
+@@ -0,0 +1,115 @@
++import CoreGraphics
++import ImageIO
++import XCTest
++@testable import UnreadCore
++
++final class UnreadCoreTests: XCTestCase {
++    let window = CGRect(x: 0, y: 0, width: 1287, height: 768)
++    func row(_ uid: String, _ y: CGFloat, id: Int = 10) -> ConversationRow {
++        ConversationRow(nodeID: id, uid: uid, frame: CGRect(x: 64, y: y, width: 202, height: 44))
++    }
++    // Catches ignoring pixels, treating a global badge/timer as the row dot, or an inverted image.
++    func testRealScreenshotRedDotOnly() throws {
++        let image = try fixture("2026-08-26-105614-red-dot.jpeg")
++        XCTAssertEqual(RedDotDetector.targets(image: image, window: window, rows: [row("tb263147182", 282), row("stoneshishininger", 330, id: 11)]).map(\.uid), ["tb263147182"])
++    }
++    func testRealNoDotAvatarAndGlobalBadgeAreExcluded() throws {
++        let image = try fixture("2026-08-26-105941-no-red-dot.jpeg")
++        XCTAssertEqual(RedDotDetector.targets(image: image, window: window, rows: [row("tb263147182", 282), row("stoneshishininger", 330, id: 11)]).map(\.uid), [])
++    }
++    // Catches fixed row number, fixed screen coordinates, and failure to map retina pixels.
++    func testDotsOnRowsOneFiveTenAtTranslatedAndDoubleScale() {
++        for scale in [1, 2] {
++            for target in [0, 4, 9] {
++                let origin = CGPoint(x: 700, y: 100)
++                let frame = CGRect(origin: origin, size: window.size)
++                let rows = (0..<10).map { i in ConversationRow(nodeID: i, uid: i == target ? "stoneshishininger" : "user-\(i)", frame: CGRect(x: 764, y: 250 + i * 44, width: 202, height: 44)) }
++                let image = synthetic(scale: scale, dots: [(99, 160 + target * 44)])
++                XCTAssertEqual(RedDotDetector.targets(image: image, window: frame, rows: rows).map(\.uid), ["stoneshishininger"])
++            }
++        }
++    }
++    func testMultipleDotsSortByScreenPositionNotArrayOrder() {
++        let rows = [row("bottom", 546), row("top", 150), row("middle", 326)]
++        XCTAssertEqual(RedDotDetector.targets(image: synthetic(dots: [(99, 160), (99, 336), (99, 556)]), window: window, rows: rows).map(\.uid), ["top", "middle", "bottom"])
++    }
++    func testAvatarTimerGlobalBadgeAndOversizeRedAreaExcluded() {
++        var image = synthetic(dots: [(238, 160), (97, 185), (38, 186)])
++        paint(&image, x: 82, y: 160, radius: 13) // orange/red avatar, not a small isolated corner dot
++        XCTAssertTrue(RedDotDetector.targets(image: image, window: window, rows: [row("alice", 150)]).isEmpty)
++    }
++    // Catches UID-prefix assumptions, truncation acceptance, or arbitrary AXGroup classification.
++    func testStructuralRowsPreserveFullArbitraryUID() throws {
++        XCTAssertEqual(try ConversationLocator.rows(nodes: nodes(), window: window).map(\.uid), ["stoneshishininger", "中文-user.@_verylongidentity"])
++    }
++    func testMissingStructuralAnchorIsExplicitFailure() {
++        XCTAssertThrowsError(try ConversationLocator.rows(nodes: nodes().filter { $0.id != 2 }, window: window))
++    }
++    func testTruncatedAndAmbiguousUIDsRejected() throws {
++        var data = nodes()
++        data.append(AXNode(id: 12, parent: 3, role: "AXGroup", title: "truncated...", frame: CGRect(x: 64, y: 400, width: 202, height: 44)))
++        data.append(AXNode(id: 13, parent: 3, role: "AXGroup", title: "alice", description: "bob", frame: CGRect(x: 64, y: 450, width: 202, height: 44)))
++        XCTAssertEqual(try ConversationLocator.rows(nodes: data, window: window).count, 2)
++    }
++    func testFreshUIDFollowsReorderAndDisappearanceIsSafe() {
++        XCTAssertEqual(ConversationLocator.fresh(uid: "alice", rows: [row("bob", 250), row("alice", 650)])?.frame.minY, 650)
++        XCTAssertNil(ConversationLocator.fresh(uid: "missing", rows: [row("alice", 250)]))
++        XCTAssertNil(ConversationLocator.fresh(uid: "alice", rows: [row("alice", 250), row("alice", 300)]))
++    }
++    func testOnlyAmbiguousRowsMustNotClaimNoUnread() {
++        let data = nodes().map { node in
++            if node.id == 11 { return AXNode(id: 11, parent: 3, role: "AXGroup", title: "stoneshishininger", frame: node.frame) }
++            return node
++        }
++        XCTAssertThrowsError(try ConversationLocator.rows(nodes: data, window: window))
++    }
++    func testChildOutsideItsListContainerIsExcluded() throws {
++        var data = nodes()
++        data.append(AXNode(id: 12, parent: 3, role: "AXGroup", title: "outside", frame: CGRect(x: 0, y: 400, width: 202, height: 44)))
++        XCTAssertEqual(try ConversationLocator.rows(nodes: data, window: window).map(\.uid), ["stoneshishininger", "中文-user.@_verylongidentity"])
++    }
++    func testHeaderVerificationRequiresExactFullIdentity() {
++        XCTAssertTrue(ConversationLocator.verified(expected: "alice", actual: "alice"))
++        XCTAssertFalse(ConversationLocator.verified(expected: "alice", actual: "bob"))
++        XCTAssertFalse(ConversationLocator.verified(expected: "stoneshishininger", actual: "stoneshishinin..."))
++        XCTAssertFalse(ConversationLocator.verified(expected: "", actual: ""))
++        XCTAssertEqual(ConversationLocator.header(nodes: nodes(), window: window), "alice")
++    }
++    func nodes() -> [AXNode] {
++        [AXNode(id: 0, role: "AXWindow", frame: window),
++         AXNode(id: 1, parent: 0, role: "AXGroup", frame: CGRect(x: 58, y: 170, width: 212, height: 590)),
++         AXNode(id: 2, parent: 1, role: "AXCheckBox", title: "正在接待买家列表", frame: CGRect(x: 74, y: 240, width: 100, height: 30)),
++         AXNode(id: 3, parent: 1, role: "AXGroup", frame: CGRect(x: 64, y: 280, width: 202, height: 480)),
++         AXNode(id: 10, parent: 3, role: "AXGroup", title: "stoneshishininger", frame: CGRect(x: 64, y: 282, width: 202, height: 44)),
++         AXNode(id: 11, parent: 3, role: "AXGroup", title: "中文-user.@_verylongidentity", frame: CGRect(x: 64, y: 330, width: 202, height: 44)),
++         AXNode(id: 20, parent: 0, role: "AXGroup", frame: CGRect(x: 270, y: 86, width: 580, height: 42)),
++         AXNode(id: 21, parent: 20, role: "AXStaticText", value: "alice", frame: CGRect(x: 315, y: 96, width: 150, height: 22)),
++         AXNode(id: 22, parent: 20, role: "AXButton", title: "转发当前用户", frame: CGRect(x: 750, y: 96, width: 24, height: 22)),
++         AXNode(id: 23, parent: 20, role: "AXButton", title: "新建任务", frame: CGRect(x: 786, y: 96, width: 24, height: 22)),
++         AXNode(id: 30, parent: 0, role: "AXGroup", title: "unrelated", frame: CGRect(x: 64, y: 500, width: 202, height: 44))]
++    }
++    func fixture(_ name: String) throws -> PixelImage {
++        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
++        let source = try XCTUnwrap(CGImageSourceCreateWithURL(root.appendingPathComponent("evidence/\(name)") as CFURL, nil))
++        let cg = try XCTUnwrap(CGImageSourceCreateImageAtIndex(source, 0, nil))
++        var bytes = [UInt8](repeating: 0, count: cg.width * cg.height * 4)
++        let context = try XCTUnwrap(CGContext(data: &bytes, width: cg.width, height: cg.height, bitsPerComponent: 8, bytesPerRow: cg.width * 4, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
++        context.draw(cg, in: CGRect(x: 0, y: 0, width: cg.width, height: cg.height))
++        return PixelImage(width: cg.width, height: cg.height, rgba: bytes)
++    }
++    func synthetic(scale: Int = 1, dots: [(Int, Int)]) -> PixelImage {
++        var image = PixelImage(width: 1287 * scale, height: 768 * scale, rgba: [UInt8](repeating: 255, count: 1287 * 768 * scale * scale * 4))
++        for (x, y) in dots { paint(&image, x: x * scale, y: y * scale, radius: 3 * scale) }
++        return image
++    }
++    func paint(_ image: inout PixelImage, x: Int, y: Int, radius: Int) {
++        var pixels = image.rgba
++        for py in max(0, y - radius)...min(image.height - 1, y + radius) {
++            for px in max(0, x - radius)...min(image.width - 1, x + radius) where (px-x)*(px-x)+(py-y)*(py-y) <= radius*radius {
++                let i = (py * image.width + px) * 4
++                pixels[i] = 245; pixels[i+1] = 20; pixels[i+2] = 25
++            }
++        }
++        image = PixelImage(width: image.width, height: image.height, rgba: pixels)
++    }
++}
+diff --git a/work/qianniu-unread-assistant/Packaging/Info.plist b/work/qianniu-unread-assistant/Packaging/Info.plist
+new file mode 100644
+index 0000000..b24a56f
+--- /dev/null
++++ b/work/qianniu-unread-assistant/Packaging/Info.plist
+@@ -0,0 +1,14 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
++<plist version="1.0"><dict>
++<key>CFBundleExecutable</key><string>UnreadApp</string>
++<key>CFBundleIdentifier</key><string>com.local.qianniu-unread-assistant</string>
++<key>CFBundleName</key><string>千牛未读助手</string>
++<key>CFBundleDisplayName</key><string>千牛未读助手</string>
++<key>CFBundlePackageType</key><string>APPL</string>
++<key>CFBundleShortVersionString</key><string>1.0</string>
++<key>CFBundleVersion</key><string>1</string>
++<key>LSMinimumSystemVersion</key><string>14.0</string>
++<key>NSHighResolutionCapable</key><true/>
++<key>NSPrincipalClass</key><string>NSApplication</string>
++</dict></plist>
+diff --git a/work/qianniu-unread-assistant/scripts/build-app.sh b/work/qianniu-unread-assistant/scripts/build-app.sh
+new file mode 100644
+index 0000000..b474d66
+--- /dev/null
++++ b/work/qianniu-unread-assistant/scripts/build-app.sh
+@@ -0,0 +1,28 @@
++#!/bin/bash
++set -euo pipefail
++PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
++SIGN_IDENTITY='Apple Development: Chu Ye Shi (6Q9HFP6LJJ)'
++if ! security find-identity -v -p codesigning | /usr/bin/grep -Fq "$SIGN_IDENTITY"; then
++  echo "Missing signing identity: $SIGN_IDENTITY" >&2
++  exit 1
++fi
++swift test --package-path "$PROJECT_DIR"
++swift build --package-path "$PROJECT_DIR" -c release
++BIN_DIR="$(swift build --package-path "$PROJECT_DIR" -c release --show-bin-path)"
++OUTPUT_DIR="$PROJECT_DIR/output"
++APP="$OUTPUT_DIR/千牛未读助手.app"
++if [[ -e "$APP" ]]; then
++  EXISTING_ID=$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$APP/Contents/Info.plist" 2>/dev/null || true)
++  if [[ "$EXISTING_ID" != 'com.local.qianniu-unread-assistant' ]]; then
++    echo "Refusing to overwrite unrelated existing bundle: $APP" >&2
++    exit 1
++  fi
++fi
++mkdir -p "$APP/Contents/MacOS"
++cp "$BIN_DIR/UnreadApp" "$APP/Contents/MacOS/UnreadApp"
++cp "$PROJECT_DIR/Packaging/Info.plist" "$APP/Contents/Info.plist"
++plutil -lint "$APP/Contents/Info.plist"
++codesign --force --sign "$SIGN_IDENTITY" --options runtime "$APP"
++codesign --verify --deep --strict --verbose=2 "$APP"
++du -sh "$APP"
++echo "$APP"
+diff --git a/work/qianniu-unread-assistant/README.md b/work/qianniu-unread-assistant/README.md
+new file mode 100644
+index 0000000..caedf20
+--- /dev/null
++++ b/work/qianniu-unread-assistant/README.md
+@@ -0,0 +1,39 @@
++# 千牛未读助手（独立第一版）
++
++只在点击“查找并打开”时检查当前可见接待列表的头像红点，选择最上方的可靠目标，读取完整 ID，打开并核对聊天顶部完整 ID。不后台轮询、不滚动、不清除筛选、不读取聊天正文、不生成或发送回复。
++
++## 构建
++
++要求 macOS 14+、Swift 6，零第三方依赖。当前构建环境 Swift 6.3.3、Apple Silicon。
++
++```sh
++bash work/qianniu-unread-assistant/scripts/build-app.sh
++```
++
++输出 `work/qianniu-unread-assistant/output/千牛未读助手.app`，bundle ID `com.local.qianniu-unread-assistant`。脚本先测试，再构建 release，使用本机现有 `Apple Development: Chu Ye Shi (6Q9HFP6LJJ)` 签名并验证；不导出私钥，不修改其他应用。签名身份缺失时明确失败。控制者检查目标不存在后，才安装到 `/Applications/千牛未读助手.app`。
++
++## 使用与权限
++
++打开千牛接待中心，保持窗口未最小化。打开助手并点击“查找并打开”。可用底部设置链接打开对应系统面板，手动为此新应用启用“辅助功能”和“屏幕与系统音频录制”；这两个权限与旧应用独立。授权后重新打开助手。设置链接只打开面板，应用不改系统权限，也不自动弹出授权请求。
++
++没有红点时只报告“当前可见列表未检测到红点”；结构不可识别或身份不完整时明确报错，不视为没有未读。打开前会重复截图和读取列表；捕获期间列表/窗口改变会停止。激活后再次核对红点，点击前同步重新定位相同完整 ID；优先 AXPress，回退点击必须通过系统命中核对。点击后仅完整 ID 精确一致才报告已打开。
++
++## 隐私和诊断
++
++截图仅在内存处理，不落盘。仅读取列表行容器的身份字段、结构性控件标签及与聊天标题控件对齐的标题字段；不读取消息正文/输入框值。没有网络请求、AI API、旧应用依赖或业务队列。
++
++首次有权限的检查会覆盖写入一个文件：
++
++`~/Library/Application Support/QianniuUnreadAssistant/last-diagnostic.txt`
++
++仅包含最后一次窗口编号、时间、AX节点ID/父节点ID/角色/矩形及少量结构锚点标记；无 UID、聊天文本或截图。可用于排查千牛不同版本的辅助功能结构。
++
++## 测试与边界
++
++```sh
++swift test --package-path work/qianniu-unread-assistant
++```
++
++测试直接加载不可变证据截图，同时覆盖第1/5/10行、窗口平移、2倍像素、列表重排、多个红点、红头像/计时/全局徽标排除、任意完整ID、截断/歧义拒绝、截图期间移动、权限失败和核对失败。外部AX/截图/点击边界在编排测试中使用测试替身，不执行真实UI。
++
++红点形状和头像角标区域根据所供千牛截图校准；不承诺未知布局/主题均适用。任意头像恰好包含同位置同大小的红圆图案在纯图像上不可区分，因此本版不是千牛业务未读状态的语义API。不同千牛结构需要通过诊断验证；完整端到端成功需用户授权及真实红点可用时进行。不把打开聊天视为已回复。

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "https://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>zh_CN</string>
+    <key>CFBundleDisplayName</key>
+	<string>千牛主聊天区OCR-PlanB-最新版</string>
+	<key>CFBundleExecutable</key>
+	<string>千牛主聊天区OCR-PlanB</string>
+    <key>CFBundleIdentifier</key>
+	<string>com.local.qianniu-main-chat-ocr-plan-b.current</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+	<key>CFBundleName</key>
+	<string>千牛主聊天区OCR-PlanB-最新版</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>14.0</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSHumanReadableCopyright</key>
+    <string>Local OCR utility</string>
+    <key>NSScreenCaptureUsageDescription</key>
+    <string>用于截取千牛接待中心右侧的消息记录面板并在本机进行 OCR。</string>
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+</dict>
+</plist>

@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 2,
+  "createdAt": "2026-09-04T04:24:20.503562+00:00",
+  "product": "千牛全自动客服-版本B",
+  "bundleIdentifier": "com.scy.qianniu-autoreply.version-b",
+  "architecture": "arm64",
+  "gitCommit": "0f5b69e1df645c148ad1a29145473ba8dc623a22",
+  "gitBranch": "codex/video-validation-retry-fix",
+  "gitBundleVerified": true,
+  "gitCloneVerified": true,
+  "sourceSnapshot": "02-源码/源码快照.zip",
+  "editableSource": "02-源码/完整可编译源码",
+  "gitBundle": "03-Git完整历史/千牛全自动客服.bundle",
+  "distribution": {
+    "file": "千牛全自动客服-版本B.dmg",
+    "sha256": "150fadb7fa0f9e734e04a4a4ac16555bb502dd1980fd7debcc8f626e807dc350"
+  },
+  "maintenance": {
+    "retentionDays": 30,
+    "highWatermarkGiB": 10,
+    "targetGiB": 8
+  },
+  "privacy": {
+    "customerRuntimeDataIncluded": false,
+    "codexCredentialsIncluded": false,
+    "developerBuildCachesIncluded": false
+  }
+}

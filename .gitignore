@@ -1,0 +1,58 @@
+# macOS metadata
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Editors and local sessions
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+*.ses
+
+# Swift / Xcode build products
+**/.build/
+**/.swiftpm/
+**/DerivedData/
+**/*.xcodeproj/xcuserdata/
+**/*.xcworkspace/xcuserdata/
+**/*.xcuserstate
+
+# Python caches and virtual environments
+**/__pycache__/
+*.py[cod]
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+**/.coverage
+**/htmlcov/
+**/.venv/
+**/venv/
+
+# Node / web tooling
+**/node_modules/
+**/.pnpm-store/
+**/coverage/
+
+# Local logs, temporary files, and crash reports
+*.log
+*.tmp
+*.temp
+*.pid
+*.crash
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Disposable development clones created from the bundled Git history
+/02-工作源码/
+/02-工作源码-双语界面/
+
+# Locally regenerated application and installer output
+/05-重新构建输出/

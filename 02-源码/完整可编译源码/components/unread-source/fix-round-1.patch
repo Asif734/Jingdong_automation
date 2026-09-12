@@ -1,0 +1,127 @@
+--- work/qianniu-unread-assistant/task-1-review.patch	2026-08-26 11:12:18
++++ work/qianniu-unread-assistant/final-review.patch	2026-08-26 11:14:45
+@@ -12,10 +12,10 @@
+ +], targets: [.target(name: "UnreadCore"), .executableTarget(name: "UnreadApp", dependencies: ["UnreadCore"]), .testTarget(name: "UnreadCoreTests", dependencies: ["UnreadCore"])])
+ diff --git a/work/qianniu-unread-assistant/Sources/UnreadCore/ConversationLocator.swift b/work/qianniu-unread-assistant/Sources/UnreadCore/ConversationLocator.swift
+ new file mode 100644
+-index 0000000..630139e
++index 0000000..26d61dc
+ --- /dev/null
+ +++ b/work/qianniu-unread-assistant/Sources/UnreadCore/ConversationLocator.swift
+-@@ -0,0 +1,76 @@
++@@ -0,0 +1,79 @@
+ +import Foundation
+ +import CoreGraphics
+ +public enum ConversationLocator {
+@@ -50,16 +50,19 @@
+ +                      node.frame.height >= 30, node.frame.height <= 100,
+ +                      node.frame.width >= container.frame.width * 0.75,
+ +                      node.frame.minY >= anchor.frame.maxY - 3,
+-+                      node.frame.maxX <= headerNode.frame.minX,
+-+                      let uid = identity(node) else { continue }
+++                      node.frame.maxX <= headerNode.frame.minX else { continue }
+++                guard let uid = identity(node) else {
+++                    throw AssistantError.unsafe("可见列表识别不完整：会话 ID 缺失、截断或有歧义；未点击。")
+++                }
+ +                result.append(ConversationRow(nodeID: node.id, uid: uid, frame: node.frame))
+ +            }
+ +        }
+ +        guard !result.isEmpty else { throw AssistantError.unsafe("未找到可可靠识别的可见会话行（不是无未读结论）。") }
+ +        let counts = Dictionary(grouping: result, by: \.uid)
+-+        let unique = result.filter { counts[$0.uid]?.count == 1 }.sorted { $0.frame.minY < $1.frame.minY }
+-+        guard !unique.isEmpty else { throw AssistantError.unsafe("可见会话身份有歧义；未点击。") }
+-+        return unique
+++        guard counts.values.allSatisfy({ $0.count == 1 }) else {
+++            throw AssistantError.unsafe("可见列表识别不完整：会话 ID 重复；未点击。")
+++        }
+++        return result.sorted { $0.frame.minY < $1.frame.minY }
+ +    }
+ +    public static func fresh(uid: String, rows: [ConversationRow]) -> ConversationRow? {
+ +        let matches = rows.filter { $0.uid == uid }
+@@ -406,7 +409,7 @@
+ +}
+ diff --git a/work/qianniu-unread-assistant/Sources/UnreadApp/UnreadAssistantApp.swift b/work/qianniu-unread-assistant/Sources/UnreadApp/UnreadAssistantApp.swift
+ new file mode 100644
+-index 0000000..15bc8b8
++index 0000000..b7cf03f
+ --- /dev/null
+ +++ b/work/qianniu-unread-assistant/Sources/UnreadApp/UnreadAssistantApp.swift
+ @@ -0,0 +1,54 @@
+@@ -415,7 +418,7 @@
+ +
+ +@main struct UnreadAssistantApp: App {
+ +    var body: some Scene {
+-+        WindowGroup("千牛未读助手") { AssistantView() }
+++        Window("千牛未读助手", id: "unread-assistant") { AssistantView() }
+ +            .defaultSize(width: 520, height: 280)
+ +            .windowResizability(.contentSize)
+ +    }
+@@ -571,10 +574,10 @@
+ +}
+ diff --git a/work/qianniu-unread-assistant/Tests/UnreadCoreTests/UnreadCoreTests.swift b/work/qianniu-unread-assistant/Tests/UnreadCoreTests/UnreadCoreTests.swift
+ new file mode 100644
+-index 0000000..0cdfbfc
++index 0000000..c083449
+ --- /dev/null
+ +++ b/work/qianniu-unread-assistant/Tests/UnreadCoreTests/UnreadCoreTests.swift
+-@@ -0,0 +1,115 @@
++@@ -0,0 +1,138 @@
+ +import CoreGraphics
+ +import ImageIO
+ +import XCTest
+@@ -622,12 +625,35 @@
+ +    func testMissingStructuralAnchorIsExplicitFailure() {
+ +        XCTAssertThrowsError(try ConversationLocator.rows(nodes: nodes().filter { $0.id != 2 }, window: window))
+ +    }
+-+    func testTruncatedAndAmbiguousUIDsRejected() throws {
+++    func testTruncatedAndAmbiguousUIDsMakeListIncomplete() {
+ +        var data = nodes()
+ +        data.append(AXNode(id: 12, parent: 3, role: "AXGroup", title: "truncated...", frame: CGRect(x: 64, y: 400, width: 202, height: 44)))
+ +        data.append(AXNode(id: 13, parent: 3, role: "AXGroup", title: "alice", description: "bob", frame: CGRect(x: 64, y: 450, width: 202, height: 44)))
+-+        XCTAssertEqual(try ConversationLocator.rows(nodes: data, window: window).count, 2)
+++        XCTAssertThrowsError(try ConversationLocator.rows(nodes: data, window: window))
+ +    }
+++    // Catches silently dropping uncertain rows and then claiming no dot because valid rows survive.
+++    func testMixedValidAndAmbiguousRowWithOnlyDotOnAmbiguousRowFailsExplicitly() {
+++        let data = nodes().map { node in
+++            node.id == 11 ? AXNode(id: 11, parent: 3, role: "AXGroup", title: "alice", description: "bob", frame: node.frame) : node
+++        }
+++        assertIncompleteListWithDot(nodes: data, dotY: 340, rowY: 330)
+++    }
+++    func testMixedValidAndTruncatedRowWithOnlyDotOnTruncatedRowFailsExplicitly() {
+++        let data = nodes().map { node in
+++            node.id == 11 ? AXNode(id: 11, parent: 3, role: "AXGroup", title: "truncated...", frame: node.frame) : node
+++        }
+++        assertIncompleteListWithDot(nodes: data, dotY: 340, rowY: 330)
+++    }
+++    func testMixedValidAndDuplicateRowsWithOnlyDotOnDuplicateRowFailsExplicitly() {
+++        var data = nodes()
+++        data.append(AXNode(id: 12, parent: 3, role: "AXGroup", title: "中文-user.@_verylongidentity", frame: CGRect(x: 64, y: 400, width: 202, height: 44)))
+++        assertIncompleteListWithDot(nodes: data, dotY: 410, rowY: 400)
+++    }
+++    private func assertIncompleteListWithDot(nodes: [AXNode], dotY: Int, rowY: CGFloat, file: StaticString = #filePath, line: UInt = #line) {
+++        let image = synthetic(dots: [(99, dotY)])
+++        XCTAssertEqual(RedDotDetector.targets(image: image, window: window, rows: [row("fixture-target", rowY)]).map(\.uid), ["fixture-target"], file: file, line: line)
+++        XCTAssertThrowsError(try RedDotDetector.targets(image: image, window: window, rows: ConversationLocator.rows(nodes: nodes, window: window)), file: file, line: line)
+++    }
+ +    func testFreshUIDFollowsReorderAndDisappearanceIsSafe() {
+ +        XCTAssertEqual(ConversationLocator.fresh(uid: "alice", rows: [row("bob", 250), row("alice", 650)])?.frame.minY, 650)
+ +        XCTAssertNil(ConversationLocator.fresh(uid: "missing", rows: [row("alice", 250)]))
+@@ -746,7 +772,7 @@
+ +echo "$APP"
+ diff --git a/work/qianniu-unread-assistant/README.md b/work/qianniu-unread-assistant/README.md
+ new file mode 100644
+-index 0000000..caedf20
++index 0000000..7f9ad49
+ --- /dev/null
+ +++ b/work/qianniu-unread-assistant/README.md
+ @@ -0,0 +1,39 @@
+@@ -768,7 +794,7 @@
+ +
+ +打开千牛接待中心，保持窗口未最小化。打开助手并点击“查找并打开”。可用底部设置链接打开对应系统面板，手动为此新应用启用“辅助功能”和“屏幕与系统音频录制”；这两个权限与旧应用独立。授权后重新打开助手。设置链接只打开面板，应用不改系统权限，也不自动弹出授权请求。
+ +
+-+没有红点时只报告“当前可见列表未检测到红点”；结构不可识别或身份不完整时明确报错，不视为没有未读。打开前会重复截图和读取列表；捕获期间列表/窗口改变会停止。激活后再次核对红点，点击前同步重新定位相同完整 ID；优先 AXPress，回退点击必须通过系统命中核对。点击后仅完整 ID 精确一致才报告已打开。
+++没有红点时只报告“当前可见列表未检测到红点”；结构不可识别或任何可见候选行身份缺失、截断、歧义、重复时明确报列表识别不完整，不跳过该行或视为没有未读。应用仅有一个主窗口，运行时禁用查找按钮，不能从多个窗口同时发起操作。打开前会重复截图和读取列表；捕获期间列表/窗口改变会停止。激活后再次核对红点，点击前同步重新定位相同完整 ID；优先 AXPress，回退点击必须通过系统命中核对。点击后仅完整 ID 精确一致才报告已打开。
+ +
+ +## 隐私和诊断
+ +

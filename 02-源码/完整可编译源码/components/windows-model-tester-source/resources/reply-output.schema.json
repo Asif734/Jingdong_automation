@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "action": { "type": "string", "enum": ["reply", "reply_then_transfer"] },
+    "reply_text": { "type": "string", "minLength": 1 },
+    "transfer_reason": {
+      "type": "string",
+      "enum": ["none", "customer_explicitly_requested_human", "explicit_return_refund", "remote_assistance", "refund_operation", "logistics_lookup", "troubleshooting_exhausted"]
+    },
+    "reason": { "type": "string" }
+  },
+  "required": ["action", "reply_text", "transfer_reason", "reason"]
+}

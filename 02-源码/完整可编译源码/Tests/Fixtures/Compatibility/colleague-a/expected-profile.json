@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "expected": {
+    "windowStrategy": "calibrated-window",
+    "conversationListLevel": "verified",
+    "identitySources": ["containerTitle", "childNickname", "chatHeader", "uniquePrefix", "ocrNickname"],
+    "sendPolicy": "returnKeyOnce",
+    "blankSectionHeaderMaximumRatio": 0.80,
+    "containsBlankSectionHeader": true
+  }
+}

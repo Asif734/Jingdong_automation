@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "https://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>zh_CN</string>
+    <key>CFBundleDisplayName</key>
+    <string>千牛全自动客服-版本B</string>
+    <key>CFBundleExecutable</key>
+    <string>AutoReplyApp</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.scy.qianniu-autoreply.version-b</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>千牛全自动客服-版本B</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>14.0</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSHumanReadableCopyright</key>
+    <string>Local experimental automatic customer-service scheduler</string>
+    <key>NSScreenCaptureUsageDescription</key>
+    <string>用于在本机截取千牛接待中心消息记录，并进行离线 OCR。</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>可选地在本机识别客户视频中的语音，以便更准确地回复；未授权时仍会仅根据视频画面处理。</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>用于在获得辅助功能授权后与本机千牛客户端交互。</string>
+    <key>NSDesktopFolderUsageDescription</key>
+    <string>用于在桌面的“AI客服记录-任务隔离候选版”文件夹中读取并增量保存本地聊天记录、图片和任务状态。</string>
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+</dict>
+</plist>

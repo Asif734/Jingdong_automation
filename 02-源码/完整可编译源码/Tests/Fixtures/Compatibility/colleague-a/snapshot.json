@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "snapshot": {
+    "macOSBuild": "25G83",
+    "architecture": "arm64",
+    "qianniuVersion": "9.97.74",
+    "qianniuBuild": "20260812105806",
+    "qianniuRuntimeArchitecture": "arm64",
+    "displays": [{"relativeFrame": [[0, 0], [1680, 1050]], "scale": 2}],
+    "windows": [{
+      "roleCategory": "reception",
+      "relativeFrame": [[0, 58], [1680, 991]],
+      "captureFrame": [[0, 58], [1680, 991]],
+      "minimized": false,
+      "focused": true,
+      "regionCategories": ["conversation-list", "chat", "composer"]
+    }],
+    "nodes": [
+      {"id": 1, "role": "AXGroup", "actionNames": [], "labelCategory": "blank", "relativeFrame": [[0, 0], [1, 1]], "hasValue": false},
+      {"id": 2, "parentID": 1, "role": "AXStaticText", "actionNames": [], "labelCategory": "正在接待买家列表", "relativeFrame": [[0.05, 0.20], [0.27, 0.03]], "hasValue": true},
+      {"id": 3, "parentID": 1, "role": "AXScrollArea", "actionNames": [], "labelCategory": "blank", "relativeFrame": [[0.05, 0.24], [0.27, 0.48]], "hasValue": false},
+      {"id": 4, "parentID": 3, "role": "AXGroup", "actionNames": ["AXPress"], "labelCategory": "blank", "relativeFrame": [[0.05, 0.24], [0.27, 0.0343]], "hasValue": false},
+      {"id": 5, "parentID": 3, "role": "AXGroup", "actionNames": ["AXPress"], "labelCategory": "identity-like", "relativeFrame": [[0.05, 0.2743], [0.27, 0.0525]], "hasValue": true},
+      {"id": 6, "parentID": 5, "role": "AXStaticText", "actionNames": [], "labelCategory": "identity-like", "relativeFrame": [[0.09, 0.2800], [0.16, 0.018]], "hasValue": true},
+      {"id": 7, "parentID": 1, "role": "AXStaticText", "actionNames": [], "labelCategory": "reception-title", "relativeFrame": [[0.32, 0.10], [0.20, 0.03]], "hasValue": true},
+      {"id": 8, "parentID": 1, "role": "AXGroup", "actionNames": [], "labelCategory": "chat-region", "relativeFrame": [[0.32, 0.14], [0.43, 0.72]], "hasValue": false},
+      {"id": 9, "parentID": 8, "role": "AXTextArea", "actionNames": [], "labelCategory": "input-control", "relativeFrame": [[0.33, 0.72], [0.40, 0.12]], "hasValue": true},
+      {"id": 10, "parentID": 8, "role": "AXMenuButton", "actionNames": [], "labelCategory": "send-control", "relativeFrame": [[0.68, 0.82], [0.06, 0.035]], "hasValue": true}
+    ]
+  }
+}

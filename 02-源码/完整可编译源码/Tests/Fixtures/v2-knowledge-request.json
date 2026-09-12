@@ -1,0 +1,6 @@
+{
+  "knowledge_base_path": "/Users/scy/Desktop/AI客服记录/知识库/Grozziie-China-KB-2026-08-24.zip",
+  "history_jsonl": "{\"sender\":\"customer\",\"v\":\"TD630不开机怎么办\"}\n",
+  "cache_directory": "/Users/scy/Documents/Codex/2026-08-08/q-2/work/kb-rag-b0-20260828/cache",
+  "seed_cache_directory": "/Users/scy/Documents/Codex/2026-08-08/q-2/work/kb-rag-b0-20260828/cache"
+}

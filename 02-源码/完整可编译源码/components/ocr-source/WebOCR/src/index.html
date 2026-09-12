@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>千牛 OCR Engine</title>
+  </head>
+  <body>
+    <script>
+      window.__qianniuBootState = { error: null };
+      window.addEventListener("error", (event) => {
+        window.__qianniuBootState.error = event.error?.stack || event.message || "Unknown script error";
+      });
+      window.addEventListener("unhandledrejection", (event) => {
+        window.__qianniuBootState.error = event.reason?.stack || String(event.reason);
+      });
+    </script>
+    <script
+      type="module"
+      src="/ocr.js"
+      onerror="window.__qianniuBootState.error = 'ocr.js 模块加载失败'"
+    ></script>
+  </body>
+</html>
