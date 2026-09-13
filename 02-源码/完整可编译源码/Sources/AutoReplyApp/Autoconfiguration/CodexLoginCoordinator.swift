@@ -60,18 +60,17 @@ actor CodexLoginCoordinator {
 
     func status() async throws -> CodexLoginState {
         try ensureDedicatedHome()
-        var result = try await run(arguments: ["login", "status"], timeout: statusTimeout)
-        if !Self.isLoggedIn(result), hasImportableLocalLoginCache() {
+        if hasImportableLocalLoginCache() {
             let personalResult = try await run(
                 arguments: ["login", "status"],
                 timeout: statusTimeout,
                 codexHomeURL: personalCodexHomeURL
             )
-            if Self.isLoggedIn(personalResult),
-               (try? importLocalLoginCache()) == true {
-                result = try await run(arguments: ["login", "status"], timeout: statusTimeout)
+            if Self.isLoggedIn(personalResult) {
+                _ = try? importLocalLoginCache()
             }
         }
+        let result = try await run(arguments: ["login", "status"], timeout: statusTimeout)
         let output = result.output.trimmingCharacters(in: .whitespacesAndNewlines)
         if Self.isLoggedIn(result) {
             return .loggedIn
@@ -146,6 +145,9 @@ actor CodexLoginCoordinator {
         let destination = codexHomeURL.appendingPathComponent("auth.json")
         let data = try Data(contentsOf: source)
         guard !data.isEmpty else { return false }
+        if (try? Data(contentsOf: destination)) == data {
+            return true
+        }
         try data.write(to: destination, options: .atomic)
         try FileManager.default.setAttributes(
             [.posixPermissions: NSNumber(value: 0o600)],

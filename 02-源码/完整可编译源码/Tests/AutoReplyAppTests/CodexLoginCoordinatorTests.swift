@@ -24,7 +24,6 @@ final class CodexLoginCoordinatorTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: root) }
 
         let runner = SequencedCodexLoginRunner(results: [
-            CodexLoginProcessResult(exitCode: 1, output: "Not logged in"),
             CodexLoginProcessResult(exitCode: 0, output: "Logged in using ChatGPT"),
             CodexLoginProcessResult(exitCode: 0, output: "Logged in using ChatGPT")
         ])
@@ -54,14 +53,54 @@ final class CodexLoginCoordinatorTests: XCTestCase {
         XCTAssertEqual(permissions?.intValue, 0o600)
 
         let calls = await runner.recordedCalls()
-        XCTAssertEqual(calls.count, 3)
+        XCTAssertEqual(calls.count, 2)
         XCTAssertEqual(
             calls.map(\.arguments),
-            [["login", "status"], ["login", "status"], ["login", "status"]]
+            [["login", "status"], ["login", "status"]]
         )
-        XCTAssertEqual(calls[0].environment["CODEX_HOME"], dedicatedHome.path)
-        XCTAssertEqual(calls[1].environment["CODEX_HOME"], personalHome.path)
-        XCTAssertEqual(calls[2].environment["CODEX_HOME"], dedicatedHome.path)
+        XCTAssertEqual(calls[0].environment["CODEX_HOME"], personalHome.path)
+        XCTAssertEqual(calls[1].environment["CODEX_HOME"], dedicatedHome.path)
+    }
+
+    func testStatusReplacesStaleDedicatedLoginCacheAfterAccountSwitch() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let personalHome = root.appendingPathComponent("personal", isDirectory: true)
+        let dedicatedHome = root.appendingPathComponent("dedicated", isDirectory: true)
+        try FileManager.default.createDirectory(at: personalHome, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: dedicatedHome, withIntermediateDirectories: true)
+        try Data("new-account-token".utf8).write(
+            to: personalHome.appendingPathComponent("auth.json"),
+            options: .atomic
+        )
+        try Data("revoked-old-account-token".utf8).write(
+            to: dedicatedHome.appendingPathComponent("auth.json"),
+            options: .atomic
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let runner = SequencedCodexLoginRunner(results: [
+            CodexLoginProcessResult(exitCode: 0, output: "Logged in using ChatGPT"),
+            CodexLoginProcessResult(exitCode: 0, output: "Logged in using ChatGPT")
+        ])
+        let coordinator = CodexLoginCoordinator(
+            codexURL: URL(fileURLWithPath: "/bin/codex"),
+            codexHomeURL: dedicatedHome,
+            personalCodexHomeURL: personalHome,
+            runner: runner
+        )
+
+        let state = try await coordinator.status()
+
+        XCTAssertEqual(state, .loggedIn)
+        XCTAssertEqual(
+            try Data(contentsOf: dedicatedHome.appendingPathComponent("auth.json")),
+            Data("new-account-token".utf8)
+        )
+        let calls = await runner.recordedCalls()
+        XCTAssertEqual(calls.count, 2)
+        XCTAssertEqual(calls[0].environment["CODEX_HOME"], personalHome.path)
+        XCTAssertEqual(calls[1].environment["CODEX_HOME"], dedicatedHome.path)
     }
 
     func testStatusUsesDedicatedHomeAndNeverPersonalConfiguration() async throws {
@@ -72,6 +111,7 @@ final class CodexLoginCoordinatorTests: XCTestCase {
         let coordinator = CodexLoginCoordinator(
             codexURL: URL(fileURLWithPath: "/bin/codex"),
             codexHomeURL: home,
+            personalCodexHomeURL: URL(fileURLWithPath: "/tmp/missing-personal-codex-home"),
             runner: runner
         )
 
@@ -144,8 +184,8 @@ final class CodexLoginCoordinatorTests: XCTestCase {
         }
 
         let runner = SequencedCodexLoginRunner(results: [
-            CodexLoginProcessResult(exitCode: 1, output: "Not logged in"),
-            CodexLoginProcessResult(exitCode: 0, output: "Logged in using ChatGPT")
+            CodexLoginProcessResult(exitCode: 0, output: "Logged in using ChatGPT"),
+            CodexLoginProcessResult(exitCode: 1, output: "Not logged in")
         ])
         let coordinator = CodexLoginCoordinator(
             codexURL: URL(fileURLWithPath: "/bin/codex"),

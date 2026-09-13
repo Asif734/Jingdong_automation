@@ -107,9 +107,11 @@ import hashlib, json, pathlib, sys
 root, output, version = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2]), sys.argv[3]
 files = []
 for path in sorted(root.rglob("*")):
-    if path.is_file() and not path.is_symlink() and path.name != ".DS_Store":
+    relative = path.relative_to(root)
+    if (path.is_file() and not path.is_symlink()
+            and all(not part.startswith(".") for part in relative.parts)):
         files.append({
-            "path": path.relative_to(root).as_posix(),
+            "path": relative.as_posix(),
             "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
         })
 output.write_text(json.dumps({

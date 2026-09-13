@@ -56,3 +56,6 @@
 
 # Locally regenerated application and installer output
 /05-重新构建输出/
+
+# Packaged installers (publish these as GitHub Release assets, not Git blobs)
+*.dmg
